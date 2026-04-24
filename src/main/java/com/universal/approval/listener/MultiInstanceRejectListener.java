@@ -1,32 +1,25 @@
 package com.universal.approval.listener;
 
-import lombok.extern.slf4j.Slf4j;
-import org.flowable.engine.delegate.DelegateTask;
-import org.flowable.engine.delegate.TaskListener;
-import org.flowable.engine.impl.interceptor.CommandExecutor;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.universal.approval.command.MultiInstanceRejectWithCompensationCommand;
+import org.flowable.engine.RuntimeService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.universal.approval.command.MultiInstanceRejectWithCompensationCommand;
-
-@Slf4j
 @Component
-public class MultiInstanceRejectListener implements TaskListener {
+public class MultiInstanceRejectListener {
+    private static final Logger log = LoggerFactory.getLogger(MultiInstanceRejectListener.class);
 
-    @Autowired
-    private CommandExecutor commandExecutor;
+    private final RuntimeService runtimeService;
 
-    @Override
-    public void notify(DelegateTask delegateTask) {
-        String result = (String) delegateTask.getVariable("approve_result");
+    public MultiInstanceRejectListener(RuntimeService runtimeService) {
+        this.runtimeService = runtimeService;
+    }
 
-        if ("REJECT".equals(result)) {
-            log.info("Multi-instance task rejected: taskId={}, processInstanceId={}",
-                    delegateTask.getId(), delegateTask.getProcessInstanceId());
-
-            commandExecutor.execute(
-                new MultiInstanceRejectWithCompensationCommand(delegateTask.getId())
-            );
+    public void onRejected(String processInstanceId, String result) {
+        if ("REJECT".equalsIgnoreCase(result)) {
+            log.info("Multi-instance reject detected: processInstanceId={}", processInstanceId);
+            new MultiInstanceRejectWithCompensationCommand(runtimeService, processInstanceId).execute();
         }
     }
 }
