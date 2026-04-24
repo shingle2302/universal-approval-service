@@ -4,7 +4,7 @@ spring:
   
   # H2 数据库配置
   datasource:
-    url: jdbc:h2:file:./db/approval_db;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=USER,VALUE
+    url: jdbc:h2:file:./db/approval_db;MODE=LEGACY;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=USER,VALUE
     driver-class-name: org.h2.Driver
     username: sa
     password: 

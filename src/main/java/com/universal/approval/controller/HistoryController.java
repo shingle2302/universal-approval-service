@@ -1,25 +1,28 @@
 package com.universal.approval.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.universal.approval.entity.BizApprovalLog;
 import com.universal.approval.mapper.BizApprovalLogMapper;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.*;
+import jakarta.annotation.Resource;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import javax.annotation.Resource;
 import java.util.List;
 
-@Slf4j
 @RestController
 @RequestMapping("/approval/history")
 public class HistoryController {
-    
+
     @Resource
     private BizApprovalLogMapper approvalLogMapper;
-    
+
     @GetMapping("/log")
     public ApiResponse<List<BizApprovalLog>> getApprovalLogs(@RequestParam String businessKey) {
-        // TODO: 根据 businessKey 查询审批日志
-        List<BizApprovalLog> logs = approvalLogMapper.selectList(null);
+        List<BizApprovalLog> logs = approvalLogMapper.selectList(new LambdaQueryWrapper<BizApprovalLog>()
+                .eq(BizApprovalLog::getBusinessKey, businessKey)
+                .orderByDesc(BizApprovalLog::getCreateTime));
         return ApiResponse.success(logs);
     }
 }
