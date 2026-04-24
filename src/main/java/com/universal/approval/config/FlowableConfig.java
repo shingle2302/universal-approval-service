@@ -12,10 +12,7 @@ public class FlowableConfig implements EngineConfigurationConfigurer<SpringProce
         // 配置流程引擎
         config.setAsyncExecutorActivate(true);
         config.setDatabaseSchemaUpdate("true");
-        
-        // 配置历史级别
-        config.setHistoryLevel(org.flowable.engine.HistoryLevel.FULL);
-        
+
         // 配置流程自动部署
         config.setDeploymentName("approval-service-deployment");
     }
