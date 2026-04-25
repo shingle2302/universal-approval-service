@@ -1,6 +1,9 @@
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.actuate.autoconfigure.metrics.SystemMetricsAutoConfiguration
   datasource:
-    url: jdbc:h2:mem:approval_test;MODE=LEGACY;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=USER,VALUE;DB_CLOSE_ON_EXIT=FALSE
+    url: jdbc:h2:mem:approval_test_${random.uuid};MODE=LEGACY;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=USER,VALUE;DB_CLOSE_ON_EXIT=FALSE
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -11,3 +14,13 @@ spring:
     database-schema-update: true
     async-executor-activate: false
     db-history-used: true
+
+management:
+  metrics:
+    enable:
+      system: false
+      process: false
+      jvm: false
+    binders:
+      tomcat:
+        enabled: false

@@ -508,3 +508,32 @@ html, body {
     width: 100%;
   }
 }
+/* 交互增强：可折叠侧边栏 */
+.app-layout.sidebar-collapsed .sidebar {
+  width: 76px;
+}
+
+.app-layout.sidebar-collapsed .sidebar-header {
+  justify-content: center;
+}
+
+/* 移动端抽屉式导航 */
+@media (max-width: 960px) {
+  .sidebar {
+    position: fixed;
+    left: -260px;
+    top: 0;
+    bottom: 0;
+    z-index: 30;
+    transition: left var(--transition-normal);
+    width: 240px;
+  }
+
+  .app-layout.mobile-menu-open .sidebar {
+    left: 0;
+  }
+
+  .page-content {
+    padding: var(--space-4);
+  }
+}
