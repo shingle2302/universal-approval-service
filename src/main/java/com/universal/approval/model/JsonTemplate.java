@@ -6,7 +6,7 @@ public class JsonTemplate {
     private String templateCode;
     private String templateName;
     private Integer version;
-    private GlobalConfig globalConfigs;
+    private GlobalConfig globalConfig;
     private List<NodeConfig> nodes;
 
     public String getTemplateCode() { return templateCode; }
@@ -15,8 +15,8 @@ public class JsonTemplate {
     public void setTemplateName(String templateName) { this.templateName = templateName; }
     public Integer getVersion() { return version; }
     public void setVersion(Integer version) { this.version = version; }
-    public GlobalConfig getGlobalConfigs() { return globalConfigs; }
-    public void setGlobalConfigs(GlobalConfig globalConfigs) { this.globalConfigs = globalConfigs; }
+    public GlobalConfig getGlobalConfig() { return globalConfig; }
+    public void setGlobalConfig(GlobalConfig globalConfig) { this.globalConfig = globalConfig; }
     public List<NodeConfig> getNodes() { return nodes; }
     public void setNodes(List<NodeConfig> nodes) { this.nodes = nodes; }
 }

@@ -12,6 +12,8 @@ import org.flowable.bpmn.model.StartEvent;
 import org.flowable.bpmn.model.UserTask;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
+
 @Service
 public class BpmnGeneratorService {
 
@@ -28,13 +30,19 @@ public class BpmnGeneratorService {
         }
 
         for (NodeConfig node : template.getNodes()) {
-            if (node.getNext() != null) {
-                process.addFlowElement(new SequenceFlow(node.getId(), node.getNext()));
-            } else if (node.getConditions() != null) {
-                for (ConditionConfig cond : node.getConditions()) {
-                    SequenceFlow flow = new SequenceFlow(node.getId(), cond.getNext());
-                    flow.setConditionExpression(cond.getExpression());
-                    process.addFlowElement(flow);
+            if (node.getNextNodes() != null && !node.getNextNodes().isEmpty()) {
+                for (Map.Entry<String, String> entry : node.getNextNodes().entrySet()) {
+                    String targetNode = entry.getValue();
+                    if (targetNode != null && !targetNode.isEmpty()) {
+                        SequenceFlow flow = new SequenceFlow(node.getNodeId(), targetNode);
+                        if (node.getConditions() != null && node.getConditions().containsKey(entry.getKey())) {
+                            ConditionConfig cond = node.getConditions().get(entry.getKey());
+                            if (cond != null && cond.getExpression() != null) {
+                                flow.setConditionExpression(cond.getExpression());
+                            }
+                        }
+                        process.addFlowElement(flow);
+                    }
                 }
             }
         }
@@ -43,32 +51,37 @@ public class BpmnGeneratorService {
     }
 
     private FlowElement createFlowElement(NodeConfig config) {
-        switch (config.getType()) {
-            case "start": {
+        switch (config.getNodeType()) {
+            case "startEvent": {
                 StartEvent startEvent = new StartEvent();
-                startEvent.setId(config.getId());
+                startEvent.setId(config.getNodeId());
+                startEvent.setName(config.getNodeName());
                 return startEvent;
             }
-            case "end": {
+            case "endEvent": {
                 EndEvent endEvent = new EndEvent();
-                endEvent.setId(config.getId());
+                endEvent.setId(config.getNodeId());
+                endEvent.setName(config.getNodeName());
                 return endEvent;
             }
             case "userTask": {
                 UserTask task = new UserTask();
-                task.setId(config.getId());
-                task.setName(config.getName());
-                task.setAssignee(config.getAssignee());
+                task.setId(config.getNodeId());
+                task.setName(config.getNodeName());
+                if (config.getAssigneeValue() != null && !config.getAssigneeValue().isEmpty()) {
+                    String assignee = config.getAssigneeValue();
+                    task.setAssignee(assignee);
+                }
                 return task;
             }
             case "exclusiveGateway": {
                 ExclusiveGateway gateway = new ExclusiveGateway();
-                gateway.setId(config.getId());
-                gateway.setName(config.getName());
+                gateway.setId(config.getNodeId());
+                gateway.setName(config.getNodeName());
                 return gateway;
             }
             default:
-                throw new IllegalArgumentException("Unknown node type: " + config.getType());
+                throw new IllegalArgumentException("Unknown node type: " + config.getNodeType());
         }
     }
 }

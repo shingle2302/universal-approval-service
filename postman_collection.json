@@ -1,0 +1,1100 @@
+{
+  "info": {
+    "_postman_id": "e7b5f4a1-4f2a-4a8a-b8b8-8a8a8a8a8a8a",
+    "name": "通用审批基础服务",
+    "description": "# 请假审批流程测试集\n\n本测试集包含三个测试场景：\n\n## 1. 普通审批流程（9步）\n测试完整的请假审批流程，包括直接主管审批和HR审批。\n\n## 2. 任务转交流程（10步）\n测试任务转交功能，manager1将任务转交给manager2代为审批。\n\n## 3. 任务退回流程（6步）\n测试任务被拒绝的场景，直接主管拒绝后流程结束。\n\n---\n\n## 全局变量说明\n\n### 普通流程变量\n- `businessKey`: 业务键（格式：LEAVE_ + 时间戳）\n- `processInstanceId`: 流程实例ID\n- `directManagerTaskId`: 直接主管任务ID\n- `hrTaskId`: HR任务ID\n\n### 转交流程变量\n- `delegateBusinessKey`: 转交场景业务键（格式：DELEGATE_ + 时间戳）\n- `delegateProcessInstanceId`: 转交场景流程实例ID\n- `delegateOriginalTaskId`: 转交前任务ID（manager1）\n- `delegateNewTaskId`: 转交后任务ID（manager2）\n- `delegateHrTaskId`: 转交场景HR任务ID\n\n### 退回流程变量\n- `rollbackBusinessKey`: 退回场景业务键（格式：ROLLBACK_ + 时间戳）\n- `rollbackProcessInstanceId`: 退回场景流程实例ID\n- `rollbackDirectManagerTaskId`: 退回场景直接主管任务ID\n\n---\n\n## 接口说明\n\n### 模板接口\n- `GET /api/approval/template` - 获取模板列表\n- `POST /api/approval/template/{templateCode}/deploy` - 部署模板\n\n### 流程接口\n- `POST /api/approval/process` - 启动流程\n- `GET /api/approval/process/{processInstanceId}/variables` - 获取流程变量\n\n### 任务接口\n- `GET /api/approval/task?assignee={user}` - 获取用户任务列表\n- `POST /api/approval/task/{taskId}` - 完成任务\n- `POST /api/approval/task/{taskId}/delegate` - 转交任务\n\n### 历史接口\n- `GET /api/approval/history/log?businessKey={businessKey}` - 查询审批历史",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "普通审批流程",
+      "description": "## 普通审批流程\n\n测试场景：员工提交3天请假申请，直接主管和HR依次审批通过。\n\n### 流程说明\n1. 员工提交请假申请（3天）\n2. 直接主管（manager1）审批同意\n3. HR（hr1）审批同意\n4. 流程结束\n\n### 重要说明\n**必须完整运行此文件夹（右键 -> Run folder），不能单独运行某个步骤！**\n因为变量需要在前面的步骤中保存到全局变量中。",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// 清除普通审批流程的全局变量",
+              "pm.globals.unset('businessKey');",
+              "pm.globals.unset('processInstanceId');",
+              "pm.globals.unset('directManagerTaskId');",
+              "pm.globals.unset('hrTaskId');",
+              "console.log('已清除普通审批流程的全局变量');",
+              ""
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "1. 获取模板列表",
+          "description": "### 获取模板列表\n\n获取系统中所有已创建的审批模板，检查LEAVE_001请假审批模板是否存在。\n\n**接口**: `GET /api/approval/template`\n\n**预期结果**: 返回包含LEAVE_001模板的列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/template",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "template"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. 部署LEAVE_001模板",
+          "description": "### 部署LEAVE_001模板\n\n将LEAVE_001请假审批模板部署到Flowable流程引擎，生成可执行的流程定义。\n\n**接口**: `POST /api/approval/template/LEAVE_001/deploy`\n\n**预期结果**: 模板部署成功，状态变为DEPLOYED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/template/LEAVE_001/deploy",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "template", "LEAVE_001", "deploy"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. 启动请假流程",
+          "description": "### 启动请假流程\n\n启动一个3天请假审批流程，传递审批人变量。\n\n**接口**: `POST /api/approval/process`\n\n**请求体**:\n```json\n{\n  \"templateCode\": \"LEAVE_001\",\n  \"businessKey\": \"{{businessKey}}\",\n  \"variables\": {\n    \"leave_days\": 3,\n    \"direct_manager\": \"manager1\",\n    \"senior_manager\": \"director1\",\n    \"hr\": \"hr1\"\n  }\n}\n```\n\n**变量说明**:\n- `leave_days`: 请假天数（3天≤3天，走简短流程）\n- `direct_manager`: 直接主管（manager1）\n- `senior_manager`: 上级主管（director1）\n- `hr`: 人事（hr1）\n\n**自动保存**: businessKey, processInstanceId 到全局变量",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// 在发送请求前生成唯一的业务键",
+                  "const businessKey = 'LEAVE_' + new Date().getTime();",
+                  "pm.globals.set('businessKey', businessKey);",
+                  "console.log('生成本次业务键:', businessKey);",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "console.log('步骤3响应:', pm.response.text());",
+                  "const response = pm.response.json();",
+                  "if (response.code === 200 && response.data) {",
+                  "    pm.globals.set('processInstanceId', response.data);",
+                  "    console.log('已保存processInstanceId:', response.data);",
+                  "    console.log('businessKey:', pm.globals.get('businessKey'));",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"templateCode\": \"LEAVE_001\",\n  \"businessKey\": \"{{businessKey}}\",\n  \"variables\": {\n    \"leave_days\": 3,\n    \"direct_manager\": \"manager1\",\n    \"senior_manager\": \"director1\",\n    \"hr\": \"hr1\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/approval/process",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "process"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. 获取直接主管任务",
+          "description": "### 获取直接主管任务\n\n查询直接主管（manager1）的待处理任务，获取刚才启动的请假审批任务。\n\n**接口**: `GET /api/approval/task?assignee=manager1`\n\n**预期结果**: 返回manager1的待处理任务列表，包含刚刚创建的直接主管审批任务\n\n**自动保存**: directManagerTaskId 到全局变量",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const response = pm.response.json();",
+                  "console.log('步骤4响应:', JSON.stringify(response).substring(0, 200));",
+                  "if (response.code === 200 && response.data && response.data.length > 0) {",
+                  "    const processInstanceId = pm.globals.get('processInstanceId');",
+                  "    console.log('当前processInstanceId:', processInstanceId);",
+                  "    const task = response.data.find(t => t.processInstanceId === processInstanceId);",
+                  "    const taskId = task ? task.id : response.data[0].id;",
+                  "    pm.globals.set('directManagerTaskId', taskId);",
+                  "    console.log('已保存directManagerTaskId:', taskId);",
+                  "} else {",
+                  "    console.log('没有找到manager1的待处理任务');",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/task?assignee=manager1",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "task"],
+              "query": [
+                {
+                  "key": "assignee",
+                  "value": "manager1"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5. 获取流程变量",
+          "description": "### 获取流程变量\n\n在流程结束前获取当前流程的变量信息，验证传递的参数是否正确。\n\n**注意**: 此步骤会使用businessKey获取最新的流程实例ID\n\n**接口**: `GET /api/approval/process/{processInstanceId}/variables`\n\n**预期结果**: 返回流程变量，包含：\n- leave_days: 3\n- direct_manager: manager1\n- senior_manager: director1\n- hr: hr1",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const processInstanceId = pm.globals.get('processInstanceId');",
+                  "const businessKey = pm.globals.get('businessKey');",
+                  "console.log('businessKey:', businessKey);",
+                  "console.log('processInstanceId:', processInstanceId);",
+                  "if (!processInstanceId) {",
+                  "    console.log('错误: processInstanceId未设置!');",
+                  "    console.log('请确保步骤3已成功执行');",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/process/{{processInstanceId}}/variables",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "process", "{{processInstanceId}}", "variables"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6. 完成直接主管任务",
+          "description": "### 完成直接主管任务\n\n直接主管（manager1）同意请假申请，完成当前任务。\n\n**注意**: 此步骤在发送请求前会自动获取最新的manager1任务ID\n\n**接口**: `POST /api/approval/task/{taskId}`\n\n**请求体**:\n```json\n{\n  \"assignee\": \"manager1\",\n  \"result\": \"APPROVE\",\n  \"comments\": \"同意请假\",\n  \"variables\": {}\n}\n```\n\n**预期结果**: 任务完成，流程流转到下一个节点（HR审批）",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const taskId = pm.globals.get('directManagerTaskId');",
+                  "console.log('步骤6执行前directManagerTaskId:', taskId);",
+                  "if (!taskId) {",
+                  "    console.log('错误: directManagerTaskId未设置!');",
+                  "    console.log('请确保步骤4已成功执行');",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignee\": \"manager1\",\n  \"result\": \"APPROVE\",\n  \"comments\": \"同意请假\",\n  \"variables\": {}\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/approval/task/{{directManagerTaskId}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "task", "{{directManagerTaskId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "7. 获取HR任务",
+          "description": "### 获取HR任务\n\n查询HR（hr1）的待处理任务，获取直接主管审批通过后的HR审批任务。\n\n**接口**: `GET /api/approval/task?assignee=hr1`\n\n**预期结果**: 返回hr1的待处理任务列表，包含刚刚创建的HR审批任务\n\n**自动保存**: hrTaskId 到全局变量",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// 保存HR任务ID - 必须匹配当前processInstanceId",
+                  "const response = pm.response.json();",
+                  "const processInstanceId = pm.globals.get('processInstanceId');",
+                  "console.log('步骤7响应:', JSON.stringify(response).substring(0, 200));",
+                  "console.log('当前processInstanceId:', processInstanceId);",
+                  "if (response.code === 200 && response.data && response.data.length > 0) {",
+                  "    // 找到匹配当前流程的任务",
+                  "    const task = response.data.find(t => t.processInstanceId === processInstanceId);",
+                  "    const taskId = task ? task.id : response.data[0].id;",
+                  "    pm.globals.set('hrTaskId', taskId);",
+                  "    console.log('已保存hrTaskId:', taskId);",
+                  "} else {",
+                  "    console.log('没有找到HR的待处理任务');",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/task?assignee=hr1",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "task"],
+              "query": [
+                {
+                  "key": "assignee",
+                  "value": "hr1"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "8. 完成HR任务",
+          "description": "### 完成HR任务\n\nHR（hr1）同意请假申请，完成当前任务，流程结束。\n\n**注意**: 此步骤在发送请求前会自动获取最新的hr1任务ID\n\n**接口**: `POST /api/approval/task/{taskId}`\n\n**请求体**:\n```json\n{\n  \"assignee\": \"hr1\",\n  \"result\": \"APPROVE\",\n  \"comments\": \"HR同意请假\",\n  \"variables\": {}\n}\n```\n\n**预期结果**: 任务完成，流程结束（因为3天请假不需要上级主管审批）",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const taskId = pm.globals.get('hrTaskId');",
+                  "console.log('hrTaskId:', taskId);",
+                  "if (!taskId) {",
+                  "    console.log('错误: hrTaskId未设置!');",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignee\": \"hr1\",\n  \"result\": \"APPROVE\",\n  \"comments\": \"HR同意请假\",\n  \"variables\": {}\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/approval/task/{{hrTaskId}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "task", "{{hrTaskId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "9. 查询审批历史",
+          "description": "### 查询审批历史\n\n查询整个审批流程的历史记录，验证流程是否正确执行。\n\n**接口**: `GET /api/approval/history/log?businessKey={{businessKey}}`\n\n**预期结果**: 返回审批历史列表，包含：\n1. 流程启动记录（START）\n2. 直接主管审批记录（COMPLETE，operator: manager1，status: APPROVE）\n3. HR审批记录（COMPLETE，operator: hr1，status: APPROVE）",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/history/log?businessKey={{businessKey}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "history", "log"],
+              "query": [
+                {
+                  "key": "businessKey",
+                  "value": "{{businessKey}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "任务转交流程",
+      "description": "## 任务转交流程\n\n测试场景：manager1收到请假审批任务后，将任务转交给manager2代为审批。\n\n### 流程说明\n1. 员工提交请假申请（3天）\n2. manager1收到任务，转交给manager2\n3. manager2代为审批同意\n4. HR（hr1）审批同意\n5. 流程结束\n\n### 重要说明\n**必须完整运行此文件夹（右键 -> Run folder），不能单独运行某个步骤！**",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// 清除转交流程的全局变量",
+              "pm.globals.unset('delegateBusinessKey');",
+              "pm.globals.unset('delegateProcessInstanceId');",
+              "pm.globals.unset('delegateOriginalTaskId');",
+              "pm.globals.unset('delegateNewTaskId');",
+              "pm.globals.unset('delegateHrTaskId');",
+              "console.log('已清除转交流程的全局变量');",
+              ""
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "1. 获取模板列表",
+          "description": "### 获取模板列表\n\n获取系统中所有已创建的审批模板，检查LEAVE_001请假审批模板是否存在。\n\n**接口**: `GET /api/approval/template`",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/template",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "template"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. 部署LEAVE_001模板",
+          "description": "### 部署LEAVE_001模板\n\n将LEAVE_001请假审批模板部署到Flowable流程引擎。\n\n**接口**: `POST /api/approval/template/LEAVE_001/deploy`",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/template/LEAVE_001/deploy",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "template", "LEAVE_001", "deploy"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. 启动请假流程（转交场景）",
+          "description": "### 启动请假流程（转交场景）\n\n启动一个3天请假审批流程，用于测试转交功能。\n\n**接口**: `POST /api/approval/process`\n\n**请求体**:\n```json\n{\n  \"templateCode\": \"LEAVE_001\",\n  \"businessKey\": \"{{delegateBusinessKey}}\",\n  \"variables\": {\n    \"leave_days\": 3,\n    \"direct_manager\": \"manager1\",\n    \"senior_manager\": \"director1\",\n    \"hr\": \"hr1\"\n  }\n}\n```\n\n**自动保存**: delegateBusinessKey, delegateProcessInstanceId 到全局变量",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// 在发送请求前生成唯一的业务键",
+                  "const businessKey = 'DELEGATE_' + new Date().getTime();",
+                  "pm.globals.set('delegateBusinessKey', businessKey);",
+                  "console.log('生成本次业务键:', businessKey);",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// 保存流程实例ID",
+                  "const response = pm.response.json();",
+                  "if (response.code === 200 && response.data) {",
+                  "    pm.globals.set('delegateProcessInstanceId', response.data);",
+                  "    console.log('流程启动成功，流程实例ID:', response.data);",
+                  "    console.log('业务键:', pm.globals.get('delegateBusinessKey'));",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"templateCode\": \"LEAVE_001\",\n  \"businessKey\": \"{{delegateBusinessKey}}\",\n  \"variables\": {\n    \"leave_days\": 3,\n    \"direct_manager\": \"manager1\",\n    \"senior_manager\": \"director1\",\n    \"hr\": \"hr1\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/approval/process",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "process"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. 获取直接主管任务（manager1）",
+          "description": "### 获取直接主管任务（manager1）\n\n查询直接主管（manager1）的待处理任务。\n\n**接口**: `GET /api/approval/task?assignee=manager1`\n\n**预期结果**: 返回manager1的待处理任务列表\n\n**自动保存**: delegateOriginalTaskId 到全局变量",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const response = pm.response.json();",
+                  "console.log('步骤4响应:', JSON.stringify(response).substring(0, 200));",
+                  "if (response.code === 200 && response.data && response.data.length > 0) {",
+                  "    const processInstanceId = pm.globals.get('delegateProcessInstanceId');",
+                  "    console.log('当前processInstanceId:', processInstanceId);",
+                  "    const task = response.data.find(t => t.processInstanceId === processInstanceId);",
+                  "    const taskId = task ? task.id : response.data[0].id;",
+                  "    pm.globals.set('delegateOriginalTaskId', taskId);",
+                  "    console.log('已保存delegateOriginalTaskId:', taskId);",
+                  "} else {",
+                  "    console.log('没有找到manager1的待处理任务');",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/task?assignee=manager1",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "task"],
+              "query": [
+                {
+                  "key": "assignee",
+                  "value": "manager1"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5. 转交任务（manager1 -> manager2）",
+          "description": "### 转交任务（manager1 -> manager2）\n\n将任务从manager1转交给manager2代为处理。\n\n**接口**: `POST /api/approval/task/{{delegateOriginalTaskId}}/delegate`\n\n**请求体**:\n```json\n{\n  \"assignee\": \"manager1\",\n  \"delegateTo\": \"manager2\"\n}\n```\n\n**转交说明**:\n- assignee: 原任务处理人\n- delegateTo: 被委托人（新任务处理人）\n\n**预期结果**: 任务转交成功，manager1的任务消失，manager2获得任务",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const taskId = pm.globals.get('delegateOriginalTaskId');",
+                  "console.log('delegateOriginalTaskId:', taskId);",
+                  "if (!taskId) {",
+                  "    console.log('错误: delegateOriginalTaskId未设置!');",
+                  "    console.log('请确保步骤4已成功执行');",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignee\": \"manager1\",\n  \"delegateTo\": \"manager2\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/approval/task/{{delegateOriginalTaskId}}/delegate",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "task", "{{delegateOriginalTaskId}}", "delegate"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6. 获取转交后的任务（manager2）",
+          "description": "### 获取转交后的任务（manager2）\n\n查询manager2的待处理任务，验证转交是否成功。\n\n**重要说明**: setAssignee转交后任务ID不变，仍然是同一个任务，只是assignee从manager1变为manager2\n\n**接口**: `GET /api/approval/task?assignee=manager2`\n\n**预期结果**: 返回manager2的待处理任务列表，任务ID与转交前相同\n\n**注意**: 此步骤仅用于验证转交成功，不需要保存任务ID（步骤7仍使用delegateOriginalTaskId）",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/task?assignee=manager2",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "task"],
+              "query": [
+                {
+                  "key": "assignee",
+                  "value": "manager2"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "7. 完成转交后的任务（manager2审批）",
+          "description": "### 完成转交后的任务（manager2审批）\n\nmanager2完成代为审批的请假申请。\n\n**注意**: 此步骤在发送请求前会自动获取最新的manager2任务ID\n\n**接口**: `POST /api/approval/task/{taskId}`\n\n**请求体**:\n```json\n{\n  \"assignee\": \"manager2\",\n  \"result\": \"APPROVE\",\n  \"comments\": \"同意请假（代为审批）\",\n  \"variables\": {}\n}\n```\n\n**预期结果**: 任务完成，流程流转到下一个节点（HR审批）",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const taskId = pm.globals.get('delegateOriginalTaskId');",
+                  "console.log('步骤7执行前delegateOriginalTaskId:', taskId);",
+                  "if (!taskId) {",
+                  "    console.log('错误: delegateOriginalTaskId未设置!');",
+                  "    console.log('请确保步骤4已成功执行');",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignee\": \"manager2\",\n  \"result\": \"APPROVE\",\n  \"comments\": \"同意请假（代为审批）\",\n  \"variables\": {}\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/approval/task/{{delegateOriginalTaskId}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "task", "{{delegateOriginalTaskId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "8. 获取HR任务",
+          "description": "### 获取HR任务\n\n查询HR（hr1）的待处理任务。\n\n**接口**: `GET /api/approval/task?assignee=hr1`\n\n**预期结果**: 返回hr1的待处理任务列表\n\n**自动保存**: delegateHrTaskId 到全局变量",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// 保存HR任务ID - 必须匹配当前processInstanceId",
+                  "const response = pm.response.json();",
+                  "const processInstanceId = pm.globals.get('delegateProcessInstanceId');",
+                  "console.log('步骤8响应:', JSON.stringify(response).substring(0, 200));",
+                  "console.log('当前processInstanceId:', processInstanceId);",
+                  "if (response.code === 200 && response.data && response.data.length > 0) {",
+                  "    // 找到匹配当前流程的任务",
+                  "    const task = response.data.find(t => t.processInstanceId === processInstanceId);",
+                  "    const taskId = task ? task.id : response.data[0].id;",
+                  "    pm.globals.set('delegateHrTaskId', taskId);",
+                  "    console.log('已保存delegateHrTaskId:', taskId);",
+                  "} else {",
+                  "    console.log('没有找到HR的待处理任务');",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/task?assignee=hr1",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "task"],
+              "query": [
+                {
+                  "key": "assignee",
+                  "value": "hr1"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "9. 完成HR任务",
+          "description": "### 完成HR任务\n\nHR（hr1）同意请假申请，完成当前任务，流程结束。\n\n**注意**: 此步骤在发送请求前会自动获取最新的hr1任务ID\n\n**接口**: `POST /api/approval/task/{taskId}`\n\n**请求体**:\n```json\n{\n  \"assignee\": \"hr1\",\n  \"result\": \"APPROVE\",\n  \"comments\": \"HR同意请假\",\n  \"variables\": {}\n}\n```\n\n**预期结果**: 任务完成，流程结束",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const taskId = pm.globals.get('delegateHrTaskId');",
+                  "console.log('delegateHrTaskId:', taskId);",
+                  "if (!taskId) {",
+                  "    console.log('错误: delegateHrTaskId未设置!');",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignee\": \"hr1\",\n  \"result\": \"APPROVE\",\n  \"comments\": \"HR同意请假\",\n  \"variables\": {}\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/approval/task/{{delegateHrTaskId}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "task", "{{delegateHrTaskId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10. 查询审批历史",
+          "description": "### 查询审批历史\n\n查询整个审批流程的历史记录，验证转交流程是否正确执行。\n\n**接口**: `GET /api/approval/history/log?businessKey={{delegateBusinessKey}}`\n\n**预期结果**: 返回审批历史列表，包含：\n1. 流程启动记录（START）\n2. 任务转交记录（DELEGATE）\n3. manager2完成审批记录（COMPLETE，operator: manager2）\n4. HR审批记录（COMPLETE，operator: hr1）",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/history/log?businessKey={{delegateBusinessKey}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "history", "log"],
+              "query": [
+                {
+                  "key": "businessKey",
+                  "value": "{{delegateBusinessKey}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "任务退回流程",
+      "description": "## 任务退回流程\n\n测试场景：直接主管拒绝请假申请，流程结束。\n\n### 流程说明\n1. 员工提交请假申请（5天）\n2. 直接主管（manager1）审批拒绝\n3. 流程结束（不继续到上级主管和HR）\n\n### 退回/拒绝说明\n- 退回是通过设置 result 为 REJECT 来实现的\n- 流程会根据结果判断是否继续流转\n- 当前模板配置了 REJECT 条件会结束流程",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// 清除退回流程的全局变量",
+              "pm.globals.unset('rollbackBusinessKey');",
+              "pm.globals.unset('rollbackProcessInstanceId');",
+              "pm.globals.unset('rollbackDirectManagerTaskId');",
+              "console.log('已清除退回流程的全局变量');",
+              ""
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "1. 获取模板列表",
+          "description": "### 获取模板列表\n\n获取系统中所有已创建的审批模板。\n\n**接口**: `GET /api/approval/template`",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/template",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "template"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. 部署LEAVE_001模板",
+          "description": "### 部署LEAVE_001模板\n\n将LEAVE_001请假审批模板部署到Flowable流程引擎。\n\n**接口**: `POST /api/approval/template/LEAVE_001/deploy`",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/template/LEAVE_001/deploy",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "template", "LEAVE_001", "deploy"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. 启动请假流程（退回场景）",
+          "description": "### 启动请假流程（退回场景）\n\n启动一个5天请假审批流程，用于测试拒绝场景。\n\n**接口**: `POST /api/approval/process`\n\n**请求体**:\n```json\n{\n  \"templateCode\": \"LEAVE_001\",\n  \"businessKey\": \"{{rollbackBusinessKey}}\",\n  \"variables\": {\n    \"leave_days\": 5,\n    \"direct_manager\": \"manager1\",\n    \"senior_manager\": \"director1\",\n    \"hr\": \"hr1\"\n  }\n}\n```\n\n**说明**: 5天请假会走完整流程（直接主管→上级主管→HR），但我们会在直接主管处拒绝\n\n**自动保存**: rollbackBusinessKey, rollbackProcessInstanceId 到全局变量",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// 在发送请求前生成唯一的业务键",
+                  "const businessKey = 'ROLLBACK_' + new Date().getTime();",
+                  "pm.globals.set('rollbackBusinessKey', businessKey);",
+                  "console.log('生成本次业务键:', businessKey);",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// 保存流程实例ID",
+                  "const response = pm.response.json();",
+                  "if (response.code === 200 && response.data) {",
+                  "    pm.globals.set('rollbackProcessInstanceId', response.data);",
+                  "    console.log('流程启动成功，流程实例ID:', response.data);",
+                  "    console.log('业务键:', pm.globals.get('rollbackBusinessKey'));",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"templateCode\": \"LEAVE_001\",\n  \"businessKey\": \"{{rollbackBusinessKey}}\",\n  \"variables\": {\n    \"leave_days\": 5,\n    \"direct_manager\": \"manager1\",\n    \"senior_manager\": \"director1\",\n    \"hr\": \"hr1\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/approval/process",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "process"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. 获取直接主管任务",
+          "description": "### 获取直接主管任务\n\n查询直接主管（manager1）的待处理任务。\n\n**接口**: `GET /api/approval/task?assignee=manager1`\n\n**预期结果**: 返回manager1的待处理任务列表\n\n**自动保存**: rollbackDirectManagerTaskId 到全局变量",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// 保存直接主管任务ID - 必须匹配当前processInstanceId",
+                  "const response = pm.response.json();",
+                  "const processInstanceId = pm.globals.get('rollbackProcessInstanceId');",
+                  "console.log('步骤4响应:', JSON.stringify(response).substring(0, 200));",
+                  "console.log('当前processInstanceId:', processInstanceId);",
+                  "if (response.code === 200 && response.data && response.data.length > 0) {",
+                  "    // 找到匹配当前流程的任务",
+                  "    const task = response.data.find(t => t.processInstanceId === processInstanceId);",
+                  "    const taskId = task ? task.id : response.data[0].id;",
+                  "    pm.globals.set('rollbackDirectManagerTaskId', taskId);",
+                  "    console.log('已保存rollbackDirectManagerTaskId:', taskId);",
+                  "} else {",
+                  "    console.log('没有找到manager1的待处理任务');",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/task?assignee=manager1",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "task"],
+              "query": [
+                {
+                  "key": "assignee",
+                  "value": "manager1"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5. 完成直接主管任务（拒绝）",
+          "description": "### 完成直接主管任务（拒绝）\n\n直接主管（manager1）拒绝请假申请，流程结束。\n\n**注意**: 此步骤在发送请求前会自动获取最新的manager1任务ID\n\n**接口**: `POST /api/approval/task/{taskId}`\n\n**请求体**:\n```json\n{\n  \"assignee\": \"manager1\",\n  \"result\": \"REJECT\",\n  \"comments\": \"申请信息有误，请重新提交\",\n  \"variables\": {}\n}\n```\n\n**关键点**:\n- result 设置为 REJECT 表示拒绝\n- 流程会根据结果判断是否继续\n- 当前模板配置了 REJECT 条件会结束流程\n\n**预期结果**: 任务完成，流程结束（不会继续到上级主管和HR）",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const taskId = pm.globals.get('rollbackDirectManagerTaskId');",
+                  "console.log('rollbackDirectManagerTaskId:', taskId);",
+                  "if (!taskId) {",
+                  "    console.log('错误: rollbackDirectManagerTaskId未设置!');",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignee\": \"manager1\",\n  \"result\": \"REJECT\",\n  \"comments\": \"申请信息有误，请重新提交\",\n  \"variables\": {}\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/approval/task/{{rollbackDirectManagerTaskId}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "task", "{{rollbackDirectManagerTaskId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6. 查询审批历史",
+          "description": "### 查询审批历史\n\n查询整个审批流程的历史记录，验证拒绝流程是否正确执行。\n\n**接口**: `GET /api/approval/history/log?businessKey={{rollbackBusinessKey}}`\n\n**预期结果**: 返回审批历史列表，包含：\n1. 流程启动记录（START）\n2. 直接主管拒绝记录（COMPLETE，operator: manager1，status: REJECT）\n\n**注意**: 不应该有上级主管和HR的审批记录，因为流程在直接主管处就结束了",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/approval/history/log?businessKey={{rollbackBusinessKey}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "approval", "history", "log"],
+              "query": [
+                {
+                  "key": "businessKey",
+                  "value": "{{rollbackBusinessKey}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "businessKey",
+      "value": "",
+      "type": "string",
+      "description": "普通审批流程的业务键"
+    },
+    {
+      "key": "processInstanceId",
+      "value": "",
+      "type": "string",
+      "description": "普通审批流程的流程实例ID"
+    },
+    {
+      "key": "directManagerTaskId",
+      "value": "",
+      "type": "string",
+      "description": "普通审批流程的直接主管任务ID"
+    },
+    {
+      "key": "hrTaskId",
+      "value": "",
+      "type": "string",
+      "description": "普通审批流程的HR任务ID"
+    },
+    {
+      "key": "delegateBusinessKey",
+      "value": "",
+      "type": "string",
+      "description": "转交流程的业务键"
+    },
+    {
+      "key": "delegateProcessInstanceId",
+      "value": "",
+      "type": "string",
+      "description": "转交流程的流程实例ID"
+    },
+    {
+      "key": "delegateOriginalTaskId",
+      "value": "",
+      "type": "string",
+      "description": "转交前任务ID（manager1的任务）"
+    },
+    {
+      "key": "delegateNewTaskId",
+      "value": "",
+      "type": "string",
+      "description": "转交后任务ID（manager2的任务）"
+    },
+    {
+      "key": "delegateHrTaskId",
+      "value": "",
+      "type": "string",
+      "description": "转交流程的HR任务ID"
+    },
+    {
+      "key": "rollbackBusinessKey",
+      "value": "",
+      "type": "string",
+      "description": "退回流程的业务键"
+    },
+    {
+      "key": "rollbackProcessInstanceId",
+      "value": "",
+      "type": "string",
+      "description": "退回流程的流程实例ID"
+    },
+    {
+      "key": "rollbackDirectManagerTaskId",
+      "value": "",
+      "type": "string",
+      "description": "退回流程的直接主管任务ID"
+    }
+  ]
+}

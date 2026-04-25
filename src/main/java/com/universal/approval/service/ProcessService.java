@@ -1,13 +1,16 @@
 package com.universal.approval.service;
 
+import com.universal.approval.command.JumpToNodeCommand;
 import com.universal.approval.entity.BizApprovalLog;
 import com.universal.approval.event.ApprovalCompletedEvent;
+import com.universal.approval.event.ApprovalDelegateEvent;
 import com.universal.approval.event.ApprovalEndEvent;
 import com.universal.approval.event.ApprovalMessagePublisher;
 import com.universal.approval.event.ApprovalRollbackEvent;
 import com.universal.approval.event.ApprovalStartEvent;
 import com.universal.approval.mapper.BizApprovalLogMapper;
 import jakarta.annotation.Resource;
+import org.flowable.engine.ProcessEngineConfiguration;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
@@ -38,6 +41,9 @@ public class ProcessService {
     @Resource
     private BizApprovalLogMapper approvalLogMapper;
 
+    @Resource
+    private ProcessEngineConfiguration processEngineConfiguration;
+
     @Transactional
     public String startProcess(String templateCode, String businessKey, Map<String, Object> variables) {
         Map<String, Object> startVariables = variables == null ? Collections.emptyMap() : variables;
@@ -61,6 +67,10 @@ public class ProcessService {
         return taskService.createTaskQuery().taskAssignee(assignee).list();
     }
 
+    public List<Task> getAllTasks() {
+        return taskService.createTaskQuery().list();
+    }
+
     public Task getTask(String taskId) {
         return taskService.createTaskQuery().taskId(taskId).singleResult();
     }
@@ -79,7 +89,12 @@ public class ProcessService {
 
         Map<String, Object> completeVariables = variables == null ? new HashMap<>() : new HashMap<>(variables);
         completeVariables.put("approve_result", result);
-        taskService.complete(taskId, completeVariables);
+
+        if (task.getDelegationState() != null && task.getDelegationState().toString().equals("PENDING")) {
+            taskService.resolveTask(taskId, completeVariables);
+        } else {
+            taskService.complete(taskId, completeVariables);
+        }
 
         BizApprovalLog approvalLog = new BizApprovalLog();
         approvalLog.setTemplateCode(templateCode);
@@ -102,8 +117,33 @@ public class ProcessService {
         log.info("Task completed: taskId={}, assignee={}, result={}", taskId, assignee, result);
     }
 
+    @Transactional
     public void delegateTask(String taskId, String assignee, String delegateTo) {
-        taskService.delegateTask(taskId, delegateTo);
+        Task task = getTask(taskId);
+        if (task == null) {
+            throw new IllegalArgumentException("Task not found: " + taskId);
+        }
+
+        String processInstanceId = task.getProcessInstanceId();
+        var processInstance = runtimeService.createProcessInstanceQuery().processInstanceId(processInstanceId).singleResult();
+        String businessKey = processInstance == null ? "" : processInstance.getBusinessKey();
+        String templateCode = task.getProcessDefinitionId().split(":")[0];
+
+        taskService.setAssignee(taskId, delegateTo);
+
+        BizApprovalLog approvalLog = new BizApprovalLog();
+        approvalLog.setTemplateCode(templateCode);
+        approvalLog.setBusinessKey(businessKey);
+        approvalLog.setProcessInstanceId(processInstanceId);
+        approvalLog.setTaskId(taskId);
+        approvalLog.setOperation("DELEGATE");
+        approvalLog.setOperator(assignee);
+        approvalLog.setComments("委托给 " + delegateTo);
+        approvalLog.setStatus("DELEGATED");
+        approvalLog.setCreateTime(LocalDateTime.now());
+        approvalLogMapper.insert(approvalLog);
+
+        messagePublisher.publish(new ApprovalDelegateEvent(templateCode, businessKey, processInstanceId, taskId, assignee, delegateTo));
         log.info("Task delegated: taskId={}, from={}, to={}", taskId, assignee, delegateTo);
     }
 
@@ -116,10 +156,16 @@ public class ProcessService {
 
         String processInstanceId = task.getProcessInstanceId();
         String templateCode = task.getProcessDefinitionId().split(":")[0];
-        String businessKey = runtimeService.createProcessInstanceQuery().processInstanceId(processInstanceId).singleResult().getBusinessKey();
+        var processInstance = runtimeService.createProcessInstanceQuery().processInstanceId(processInstanceId).singleResult();
+        String businessKey = processInstance == null ? "" : processInstance.getBusinessKey();
 
-        taskService.setVariable(taskId, "rollback_target_node", targetNode);
-        taskService.complete(taskId, Map.of("approve_result", "ROLLBACK", "target_node", targetNode));
+        taskService.deleteTask(taskId);
+        processEngineConfiguration.getCommandExecutor().execute(new JumpToNodeCommand(
+                runtimeService,
+                processInstanceId,
+                targetNode,
+                null
+        ));
 
         BizApprovalLog approvalLog = new BizApprovalLog();
         approvalLog.setTemplateCode(templateCode);
@@ -134,7 +180,7 @@ public class ProcessService {
         approvalLogMapper.insert(approvalLog);
 
         messagePublisher.publish(new ApprovalRollbackEvent(templateCode, businessKey, processInstanceId, taskId, targetNode, operator));
-        log.info("Task rollback handled: taskId={}, operator={}, targetNode={}", taskId, operator, targetNode);
+        log.info("Task rollback executed: taskId={}, operator={}, targetNode={}", taskId, operator, targetNode);
     }
 
     public Map<String, Object> getProcessVariables(String processInstanceId) {

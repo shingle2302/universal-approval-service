@@ -1,5 +1,6 @@
 package com.universal.approval.controller;
 
+import com.universal.approval.model.TaskDTO;
 import com.universal.approval.service.ProcessService;
 import jakarta.annotation.Resource;
 import org.flowable.task.api.Task;
@@ -7,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/approval/task")
@@ -16,17 +18,39 @@ public class TaskController {
     private ProcessService processService;
 
     @GetMapping
-    public ApiResponse<List<Task>> getTasks(@RequestParam String assignee) {
-        return ApiResponse.success(processService.getTasksByAssignee(assignee));
+    public ApiResponse<List<TaskDTO>> getTasks(@RequestParam(required = false) String assignee) {
+        List<Task> tasks;
+        if (assignee != null && !assignee.isEmpty()) {
+            tasks = processService.getTasksByAssignee(assignee);
+        } else {
+            // 获取所有任务
+            tasks = processService.getAllTasks();
+        }
+        List<TaskDTO> taskDTOs = tasks.stream()
+                .map(this::convertToTaskDTO)
+                .collect(Collectors.toList());
+        return ApiResponse.success(taskDTOs);
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<Task> getTask(@PathVariable String id) {
+    public ApiResponse<TaskDTO> getTask(@PathVariable String id) {
         Task task = processService.getTask(id);
         if (task == null) {
             return ApiResponse.error(404, "Task not found");
         }
-        return ApiResponse.success(task);
+        return ApiResponse.success(convertToTaskDTO(task));
+    }
+
+    private TaskDTO convertToTaskDTO(Task task) {
+        TaskDTO taskDTO = new TaskDTO();
+        taskDTO.setId(task.getId());
+        taskDTO.setName(task.getName());
+        taskDTO.setAssignee(task.getAssignee());
+        taskDTO.setProcessInstanceId(task.getProcessInstanceId());
+        taskDTO.setProcessDefinitionId(task.getProcessDefinitionId());
+        taskDTO.setCreateTime(task.getCreateTime());
+        taskDTO.setDueDate(task.getDueDate());
+        return taskDTO;
     }
 
     @PostMapping("/{id}")

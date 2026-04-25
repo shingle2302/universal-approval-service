@@ -19,6 +19,11 @@ const router = createRouter({
       component: () => import('../views/TaskView.vue')
     },
     {
+      path: '/process',
+      name: 'process',
+      component: () => import('../views/ProcessView.vue')
+    },
+    {
       path: '/designer',
       name: 'designer',
       component: () => import('../views/DesignerView.vue')

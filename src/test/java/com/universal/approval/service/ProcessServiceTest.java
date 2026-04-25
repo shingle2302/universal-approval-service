@@ -1,19 +1,15 @@
 package com.universal.approval.service;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-@SpringBootTest
-class ProcessServiceTest {
-
-    @Autowired
-    private ProcessService processService;
+public class ProcessServiceTest extends BaseServiceTest {
 
     @Test
     void processServiceBeanLoaded() {
-        assertNotNull(processService);
+        assertNotNull(repositoryService);
+        assertNotNull(runtimeService);
+        assertNotNull(taskService);
     }
 }

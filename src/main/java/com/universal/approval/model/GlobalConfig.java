@@ -1,13 +1,11 @@
 package com.universal.approval.model;
 
-import java.util.List;
-
 public class GlobalConfig {
-    private List<String> autoResetVarsOnReject;
-    private String dataSource;
+    private String startNode;
+    private String endNode;
 
-    public List<String> getAutoResetVarsOnReject() { return autoResetVarsOnReject; }
-    public void setAutoResetVarsOnReject(List<String> autoResetVarsOnReject) { this.autoResetVarsOnReject = autoResetVarsOnReject; }
-    public String getDataSource() { return dataSource; }
-    public void setDataSource(String dataSource) { this.dataSource = dataSource; }
+    public String getStartNode() { return startNode; }
+    public void setStartNode(String startNode) { this.startNode = startNode; }
+    public String getEndNode() { return endNode; }
+    public void setEndNode(String endNode) { this.endNode = endNode; }
 }

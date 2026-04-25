@@ -1,25 +1,32 @@
 spring:
   application:
     name: approval-service
-  
-  # H2 数据库配置
+
+  # H2 数据库配置 - 内存模式
   datasource:
-    url: jdbc:h2:file:./db/approval_db;MODE=LEGACY;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=USER,VALUE
+    url: jdbc:h2:mem:approval_db;MODE=LEGACY;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=USER,VALUE;DB_CLOSE_ON_EXIT=FALSE
     driver-class-name: org.h2.Driver
     username: sa
-    password: 
-  
+    password:
+
   # H2 Console 配置
   h2:
     console:
       enabled: true
       path: /h2-console
-  
+
+  # SQL 初始化配置
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      data-locations: classpath:data.sql
+
   # Flowable 配置
   flowable:
-    database-schema-update: true
+    database-schema-update: false
     async-executor-activate: true
-  
+
   # MyBatis-Plus 配置
   mybatis-plus:
     mapper-locations: classpath:mapper/**/*.xml
