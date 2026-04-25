@@ -1,61 +1,43 @@
 <template>
   <div class="home">
-    <!-- 面包屑 -->
     <div class="breadcrumb">
       <span class="breadcrumb-item">首页</span>
     </div>
-    
-    <!-- 欢迎区域 -->
+
     <div class="welcome-section">
       <h1>欢迎使用通用审批系统</h1>
-      <p class="welcome-description">
-        高效、智能的审批流程管理平台，让审批更简单
-      </p>
+      <p class="welcome-description">高效、智能的审批流程管理平台，让审批更简单</p>
+      <div class="welcome-actions">
+        <button class="btn btn-secondary" @click="fetchSystemStatus" :disabled="isLoading">
+          {{ isLoading ? '刷新中...' : '刷新状态' }}
+        </button>
+        <span v-if="lastUpdated" class="updated-at">最近更新：{{ lastUpdated }}</span>
+      </div>
+      <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
     </div>
-    
-    <!-- 功能卡片 -->
+
+    <div class="quick-filter">
+      <input v-model="keyword" type="text" placeholder="搜索功能（如：流程/模板/任务）" />
+    </div>
+
     <div class="feature-cards">
-      <div class="feature-card">
-        <div class="feature-icon">📋</div>
-        <h3>模板管理</h3>
-        <p>创建和管理审批流程模板</p>
-        <router-link to="/template" class="btn btn-primary">
-          进入管理
-        </router-link>
-      </div>
-      
-      <div class="feature-card">
-        <div class="feature-icon">✅</div>
-        <h3>任务管理</h3>
-        <p>处理待办审批任务</p>
-        <router-link to="/task" class="btn btn-primary">
-          查看任务
-        </router-link>
-      </div>
-      
-      <div class="feature-card">
-        <div class="feature-icon">📊</div>
-        <h3>流程管理</h3>
-        <p>发起审批和管理流程实例</p>
-        <router-link to="/process" class="btn btn-primary">
-          发起审批
-        </router-link>
-      </div>
-      
-      <div class="feature-card">
-        <div class="feature-icon">🎨</div>
-        <h3>流程设计</h3>
-        <p>可视化设计审批流程</p>
-        <router-link to="/designer" class="btn btn-primary">
-          开始设计
-        </router-link>
+      <div class="feature-card" v-for="feature in filteredFeatures" :key="feature.path">
+        <div class="feature-icon">{{ feature.icon }}</div>
+        <h3>{{ feature.title }}</h3>
+        <p>{{ feature.description }}</p>
+        <router-link :to="feature.path" class="btn btn-primary">{{ feature.action }}</router-link>
       </div>
     </div>
-    
-    <!-- 系统状态 -->
+
     <div class="status-section">
       <h2>系统状态</h2>
-      <div class="status-cards">
+      <div v-if="isLoading" class="status-cards">
+        <div class="status-card" v-for="item in 3" :key="item">
+          <div class="status-value">--</div>
+          <div class="status-label">加载中</div>
+        </div>
+      </div>
+      <div v-else class="status-cards">
         <div class="status-card">
           <div class="status-value">{{ templateCount }}</div>
           <div class="status-label">已部署模板</div>
@@ -74,34 +56,62 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import axios from 'axios'
 
 const templateCount = ref(0)
 const taskCount = ref(0)
 const processCount = ref(0)
+const isLoading = ref(false)
+const errorMessage = ref('')
+const lastUpdated = ref('')
+const keyword = ref('')
+
+const features = [
+  { icon: '📋', title: '模板管理', description: '创建和管理审批流程模板', path: '/template', action: '进入管理' },
+  { icon: '✅', title: '任务管理', description: '处理待办审批任务', path: '/task', action: '查看任务' },
+  { icon: '📊', title: '流程管理', description: '发起审批和管理流程实例', path: '/process', action: '发起审批' },
+  { icon: '🎨', title: '流程设计', description: '可视化设计审批流程', path: '/designer', action: '开始设计' }
+]
+
+const filteredFeatures = computed(() => {
+  const term = keyword.value.trim().toLowerCase()
+  if (!term) {
+    return features
+  }
+  return features.filter((item) =>
+    `${item.title}${item.description}`.toLowerCase().includes(term)
+  )
+})
 
 const fetchSystemStatus = async () => {
+  isLoading.value = true
+  errorMessage.value = ''
   try {
-    // 获取模板数量
-    const templateResponse = await axios.get('/api/approval/template')
+    const [templateResponse, taskResponse, processResponse] = await Promise.all([
+      axios.get('/api/approval/template'),
+      axios.get('/api/approval/task'),
+      axios.get('/api/approval/process')
+    ])
+
     if (templateResponse.data.code === 200) {
       templateCount.value = templateResponse.data.data?.filter(t => t.status === 'DEPLOYED').length || 0
     }
-    
-    // 获取任务数量
-    const taskResponse = await axios.get('/api/approval/task')
+
     if (taskResponse.data.code === 200) {
       taskCount.value = taskResponse.data.data?.length || 0
     }
-    
-    // 获取流程实例数量
-    const processResponse = await axios.get('/api/approval/process')
+
     if (processResponse.data.code === 200) {
       processCount.value = processResponse.data.data?.length || 0
     }
+
+    lastUpdated.value = new Date().toLocaleString('zh-CN', { hour12: false })
   } catch (error) {
+    errorMessage.value = '获取系统状态失败，请稍后重试。'
     console.log('获取系统状态失败:', error)
+  } finally {
+    isLoading.value = false
   }
 }
 
@@ -124,6 +134,38 @@ onMounted(() => {
   border-radius: var(--radius-xl);
   color: white;
   box-shadow: var(--shadow-lg);
+}
+
+.welcome-actions {
+  margin-top: var(--space-4);
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.updated-at {
+  font-size: 0.875rem;
+  opacity: 0.9;
+}
+
+.error-message {
+  margin-top: var(--space-3);
+  color: #fee2e2;
+  font-weight: 600;
+}
+
+.quick-filter {
+  margin-bottom: var(--space-6);
+}
+
+.quick-filter input {
+  width: 100%;
+  max-width: 520px;
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.8rem;
 }
 
 .welcome-section h1 {
@@ -221,11 +263,11 @@ onMounted(() => {
   .welcome-section h1 {
     font-size: 2rem;
   }
-  
+
   .feature-cards {
     grid-template-columns: 1fr;
   }
-  
+
   .status-cards {
     grid-template-columns: repeat(2, 1fr);
   }
